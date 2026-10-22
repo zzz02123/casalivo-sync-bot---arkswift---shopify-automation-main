@@ -293,18 +293,6 @@ def build_body(row: List[Any], idx: Dict[str, int]) -> str:
         )
         parts.append('<h3>Ficha técnica</h3><table style="width:100%;border-collapse:collapse">'
                      f"<tbody>{rows_html}</tbody></table>")
-    parts.append(
-        '<div style="margin-top:20px;padding:15px;background:#f1f5f9;border-radius:6px;">'
-        "<p><strong>Envío y servicio</strong></p>"
-        "<ul><li>Envío desde almacén europeo: 3-5 días laborables.</li>"
-        "<li>Stock verificado en tiempo real.</li>"
-        "<li>Seguimiento de pedido incluido.</li></ul></div>"
-    )
-    parts.append(
-        '<div style="margin-top:16px;padding:15px;background:#f8fafc;border-left:4px solid #0f172a;">'
-        "<p><strong>Garantía:</strong> 30 días para devoluciones y 12 meses de garantía "
-        "en defectos de fabricación. Atención al cliente en español.</p></div>"
-    )
     return "\n".join(parts)
 
 
@@ -359,9 +347,9 @@ def build_row(row: List[Any], idx: Dict[str, int], max_images: int,
     category_en = str(row[idx.get("Category")] or "").strip()
     category_es = spanish_group(category_en)
     body = build_body(row, idx)
-    tags = [t for t in ["Envío desde Europa", "Stock verificado", category_es or category_en] if t]
+    tags = [t for t in ["Casalivo", "Stock verificado", category_es or category_en] if t]
     seo_title = title[:70]
-    seo_desc = (title + " - Envío en 3-5 días desde almacén europeo. Garantía 12 meses.")[:160]
+    seo_desc = (title + " - Colección oficial Casalivo.")[:160]
 
     return {
         "Title": title,
@@ -371,8 +359,8 @@ def build_row(row: List[Any], idx: Dict[str, int], max_images: int,
         "Product category": shopify_category(category_en),
         "Type": category_en,
         "Tags": ", ".join(dict.fromkeys(tags)),
-        "Published on online store": "TRUE" if is_active else "FALSE",
-        "Status": "active" if is_active else "draft",
+        "Published on online store": "TRUE",
+        "Status": "active",
         "SKU": sku_clean,
         "Option1 name": "Title",
         "Option1 value": "Default Title",

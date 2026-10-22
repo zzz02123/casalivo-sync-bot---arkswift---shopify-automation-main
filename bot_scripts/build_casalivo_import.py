@@ -188,6 +188,21 @@ def pricing(cost: float) -> Dict[str, float]:
     }
 
 
+def generate_ean13_barcode(seed: str = None) -> str:
+    """生成13位EAN码，前缀 ean:，国家码 841，厂商 57926，随机 4位 + Modulo-10 校验"""
+    import hashlib, random
+    if seed:
+        h = int(hashlib.md5(str(seed).encode("utf-8")).hexdigest()[:8], 16)
+        num = h % 10000
+    else:
+        num = random.randint(0, 9999)
+    item_code = f"{num:04d}"
+    raw12 = f"84157926{item_code}"
+    s = sum(int(ch) * (1 if i % 2 == 0 else 3) for i, ch in enumerate(raw12))
+    check = (10 - (s % 10)) % 10
+    return f"ean:{raw12}{check}"
+
+
 def clean_title(raw: str) -> str:
     title = scrub(raw)
     title = re.sub(r"\s+", " ", title).strip()
@@ -251,18 +266,6 @@ def build_body(row: Dict[str, Any], idx: Dict[str, int], sku: str) -> str:
             '<h3>Ficha técnica</h3><table style="width:100%;border-collapse:collapse">'
             f'<tbody>{rows_html}</tbody></table>'
         )
-    parts.append(
-        '<div class="casalivo-shipping" style="margin-top:20px;padding:15px;background:#f1f5f9;border-radius:6px;">'
-        "<p><strong>Envío y servicio</strong></p>"
-        "<ul><li>Envío desde almacén europeo: 3-5 días laborables.</li>"
-        "<li>Stock verificado en tiempo real.</li>"
-        "<li>Seguimiento de pedido incluido.</li></ul></div>"
-    )
-    parts.append(
-        '<div class="casalivo-guarantee" style="margin-top:16px;padding:15px;background:#f8fafc;border-left:4px solid #0f172a;">'
-        f"<p><strong>Garantía {BRAND}:</strong> 30 días para devoluciones y 12 meses de garantía "
-        "en defectos de fabricación. Atención al cliente en español.</p></div>"
-    )
     body = "\n".join(parts)
     return body
 
@@ -369,7 +372,7 @@ def main() -> None:
         # Requirement 1: English 3rd-level category name into tags
         tags = [t for t in [BRAND, "Envío desde Europa", "Stock verificado", category_en, category_es] if t]
         seo_title = title[:70]
-        seo_desc = (scrub(raw_name) + " - Envío en 3-5 días desde almacén europeo. Garantía 12 meses.")[:160]
+        seo_desc = scrub(raw_name)[:160]
 
         main = {
             "Handle": handle,
@@ -392,7 +395,7 @@ def main() -> None:
             "Variant Compare At Price": "",  # GMC Protection: 默认不填划线价防虚假判定
             "Variant Requires Shipping": "TRUE",
             "Variant Taxable": "TRUE",
-            "Variant Barcode": "",
+            "Variant Barcode": generate_ean13_barcode(sku),
             "Image Src": images[0],
             "Image Position": "1",
             "Image Alt Text": title,

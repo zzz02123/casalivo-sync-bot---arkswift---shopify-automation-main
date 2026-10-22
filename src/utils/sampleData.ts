@@ -19,7 +19,7 @@ export const SAMPLE_ARK_SWIFT_PRODUCTS: ArkSwiftRawItem[] = [
       'https://images.unsplash.com/photo-1615066390971-03e4e1c36ddf?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&w=800&q=80',
     ],
-    description: 'HOMCOM mesa de comedor moderna ideal para cocinas y pisos pequeños. Cuenta con dos alas abatibles y ruedas giratorias con freno. Medidas: 140x80x74cm. Garantía del fabricante oficial en almacén España.',
+    description: 'HOMCOM mesa de comedor moderna ideal para cocinas y pisos pequeños. Cuenta con dos alas abatibles y ruedas giratorias con freno. Medidas: 140x80x74cm.',
     weight: 26.5,
   },
   {

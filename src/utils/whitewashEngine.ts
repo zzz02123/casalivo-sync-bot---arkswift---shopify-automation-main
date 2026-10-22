@@ -462,11 +462,46 @@ export function cleanseTitle(rawTitle: string, config: WhitewashConfig = DEFAULT
 /**
  * Cleanses product description HTML / text
  */
+/**
+ * Strips shipping and warranty / after-sales terms from description text and HTML.
+ * Requirement: 运输和售后不写在描述里 (Shopify stores handle shipping & returns via dedicated policy pages).
+ */
+export function stripShippingAndWarranty(htmlOrText: string): string {
+  if (!htmlOrText) return '';
+  let cleaned = htmlOrText;
+
+  // 1. Remove specific HTML blocks for guarantee, warranty, shipping
+  cleaned = cleaned.replace(/<div[^>]*class="[^"]*(?:casalivo-guarantee|casalivo-shipping|casalivo-warranty|guarantee|warranty|shipping)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+  cleaned = cleaned.replace(/<div[^>]*>[\s\S]*?(?:Envío y servicio|Garantía Casalivo|Garantía:|Atención al cliente|30 días para devoluciones)[\s\S]*?<\/div>/gi, '');
+
+  // 2. Remove supplier warranty & shipping sentences
+  const shippingWarrantyRegexes = [
+    /[^.!?<>\n\r]*(?:garant[íi]a del fabricante|manufacturer warranty|garant[íi]a oficial|garant[íi]a en defectos|devoluci[óo]n|devoluciones|posventa|postventa|after-sales|atenci[óo]n al cliente)[^.!?<>\n\r]*[.!?]?/gi,
+    /[^.!?<>\n\r]*(?:env[íi]o desde almac[ée]n|env[íi]o r[áa]pido|env[íi]o en 3-5|plazo de entrega|tiempo de entrega|almac[ée]n espa[ñn]a|almac[ée]n europeo|seguimiento de pedido incluido)[^.!?<>\n\r]*[.!?]?/gi,
+  ];
+
+  for (const reg of shippingWarrantyRegexes) {
+    cleaned = cleaned.replace(reg, '');
+  }
+
+  // 3. Clean up empty tags and excessive whitespace
+  cleaned = cleaned.replace(/<p>\s*<\/p>/gi, '');
+  cleaned = cleaned.replace(/<li>\s*<\/li>/gi, '');
+  cleaned = cleaned.replace(/\s{2,}/g, ' ');
+  cleaned = cleaned.replace(/\n\s*\n+/g, '\n');
+
+  return cleaned.trim();
+}
+
+/**
+ * Cleanses product description HTML / text.
+ * Note: Per user requirement, shipping and after-sales are NEVER appended or included in product descriptions.
+ */
 export function cleanseDescription(
   rawDesc: string = '',
   config: WhitewashConfig = DEFAULT_WHITEWASH_CONFIG
 ): string {
-  if (!rawDesc) return `<p>Premium quality collection by <strong>${config.brandName}</strong>.</p>`;
+  if (!rawDesc) return `<p>Colección exclusiva de diseño para el hogar.</p>`;
 
   let desc = rawDesc;
 
@@ -490,11 +525,12 @@ export function cleanseDescription(
   desc = desc.replace(/[\w.-]+@[\w.-]+\.\w+/gi, '');
   desc = desc.replace(/https?:\/\/[^\s<>"']+/gi, '');
 
-  // Add Casalivo signature guarantee block at the end if not already present
-  if (!desc.includes('Casalivo Guarantee')) {
-    desc += `\n<div class="casalivo-guarantee" style="margin-top: 20px; padding: 15px; border-top: 1px solid #e2e8f0; font-size: 0.9em; color: #4a5568;">
-      <p><strong>Casalivo Quality Assurance:</strong> Designed for modern European living. Carefully inspected, packaged, and dispatched with dedicated customer care.</p>
-    </div>`;
+  // Strip shipping and warranty/after-sales sentences and blocks (运输和售后不写在描述里)
+  desc = stripShippingAndWarranty(desc);
+
+  // If description became empty after stripping, provide a clean default
+  if (!desc || desc.length < 5) {
+    desc = `<p>Diseñado con materiales de alta calidad para ofrecer confort y durabilidad.</p>`;
   }
 
   return desc;
@@ -519,25 +555,26 @@ export function generateBrandSku(
  * Generates an official 13-digit EAN barcode with 'ean:' prefix:
  * - Country Code (3 digits): 841 (Spain)
  * - Manufacturer Code (5 digits): 57926
- * - Item Code (4 digits): pseudo-random / random 4 digits
+ * - Item Code (4 digits): pseudo-random / random 4 digits (0000 - 9999)
  * - Checksum Digit (1 digit): standard GS1 modulo 10 algorithm
  * Example: ean:8415792615295
  */
-export function generateEan13Barcode(seed?: string): string {
+export function generateEan13Barcode(seed?: string, forceRandom: boolean = false): string {
   const countryCode = '841';
   const manufacturerCode = '57926';
 
   let itemDigits = '';
-  if (seed) {
+  if (seed && !forceRandom) {
     let hash = 2166136261;
     for (let i = 0; i < seed.length; i++) {
       hash ^= seed.charCodeAt(i);
       hash = Math.imul(hash, 16777619);
     }
-    const num = Math.abs(hash % 9000) + 1000;
+    const num = Math.abs(hash % 10000);
     itemDigits = String(num).padStart(4, '0');
   } else {
-    itemDigits = String(Math.floor(1000 + Math.random() * 9000));
+    const randomNum = Math.floor(Math.random() * 10000);
+    itemDigits = String(randomNum).padStart(4, '0');
   }
 
   const first12 = `${countryCode}${manufacturerCode}${itemDigits}`;
@@ -552,6 +589,27 @@ export function generateEan13Barcode(seed?: string): string {
   const checkDigit = remainder === 0 ? 0 : 10 - remainder;
 
   return `ean:${first12}${checkDigit}`;
+}
+
+/**
+ * Validates whether a barcode string adheres to ean:84157926XXXXC format
+ */
+export function isValidEanBarcode(barcode?: string): boolean {
+  if (!barcode) return false;
+  if (!barcode.startsWith('ean:84157926')) return false;
+  if (barcode.length !== 17) return false;
+  const digits = barcode.slice(4);
+  if (!/^\d{13}$/.test(digits)) return false;
+
+  // Checksum test
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const d = parseInt(digits[i], 10);
+    sum += i % 2 === 0 ? d : d * 3;
+  }
+  const remainder = sum % 10;
+  const expectedCheck = remainder === 0 ? 0 : 10 - remainder;
+  return parseInt(digits[12], 10) === expectedCheck;
 }
 
 /**
@@ -589,9 +647,9 @@ export function transformArkSwiftItem(
     tagSet.add(item.mainColor);
   }
 
-  // 3. EAN-13 码生成 (国家码 841，厂商代码 57926，随机4位项目码 + 校验位，加前缀 ean:)
+  // 3. EAN-13 码强制规则 (国家码 841，厂商代码 57926，4位随机代码 + 校验位，加前缀 ean:)
   let barcode = item.barcode;
-  if (!barcode || !barcode.startsWith('ean:84157926') || barcode.length !== 17) {
+  if (!barcode || !isValidEanBarcode(barcode)) {
     barcode = generateEan13Barcode(item.originalSku || item.id);
   }
 
@@ -629,7 +687,8 @@ export function transformArkSwiftItem(
     barcode,
     tags: Array.from(tagSet),
     descriptionHtml: cleanDescHtml,
-    status: availableStock > 0 ? 'active' : 'draft',
+    // 0库存商品也设置 active (后续通过库存表单独更新，库存表无 status 字段)
+    status: 'active',
     syncStatus: 'idle',
   };
 }

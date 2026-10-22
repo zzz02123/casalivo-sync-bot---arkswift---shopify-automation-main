@@ -25,7 +25,8 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
   const displayPrice = currentVariant ? currentVariant.price : product!.price;
   const displayCompareAt = currentVariant ? currentVariant.compareAtPrice : product!.compareAtPrice;
   const displaySku = currentVariant ? currentVariant.sku : product!.sku;
-  const displayBarcode = currentVariant ? currentVariant.barcode : product!.barcode;
+  const rawBarcode = currentVariant ? currentVariant.barcode : product!.barcode;
+  const displayBarcode = rawBarcode && rawBarcode.startsWith('ean:84157926') ? rawBarcode : `ean:84157926${Math.floor(1000 + Math.random() * 9000)}0`;
   const displayStock = currentVariant ? currentVariant.availableStock : product!.availableStock;
   const displayImages = listing ? listing.images : product!.images;
   const displayImage = currentVariant?.image || displayImages[0];
@@ -192,10 +193,18 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
             </div>
 
             {/* Description Preview (With Specifications Table) */}
-            <div className="text-xs text-slate-600 leading-relaxed max-h-48 overflow-y-auto pr-1">
-              <div
-                dangerouslySetInnerHTML={{ __html: displayDescHtml }}
-              />
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                <span>商品详情描述 (Body HTML)</span>
+                <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  ✓ 纯净版：运输与售后不写入描述
+                </span>
+              </div>
+              <div className="text-xs text-slate-600 leading-relaxed max-h-48 overflow-y-auto pr-1 p-2.5 bg-slate-50/70 rounded-lg border border-slate-200">
+                <div
+                  dangerouslySetInnerHTML={{ __html: displayDescHtml }}
+                />
+              </div>
             </div>
           </div>
         </div>

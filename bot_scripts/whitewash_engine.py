@@ -125,12 +125,11 @@ class WhitewashEngine:
         desc = re.sub(r"https?://[^\s<>\"']+", "", desc)
         desc = re.sub(r"[\w.-]+@[\w.-]+\.\w+", "", desc)
 
-        guarantee_html = (
-            f'<div class="casalivo-guarantee" style="margin-top:20px;padding:15px;background:#f8fafc;border-left:4px solid #0f172a;">'
-            f'<p><strong>{cls.BRAND_NAME} 质保说明:</strong> 欧洲本地极速发货，全检出库，提供专属无忧售后保障。</p>'
-            f'</div>'
-        )
-        return desc + guarantee_html
+        # 纯净商品描述：运输与售后政策不写入描述中
+        desc = re.sub(r'<div[^>]*class="[^"]*(?:casalivo-guarantee|casalivo-shipping|casalivo-warranty)[^"]*"[^>]*>[\s\S]*?</div>', '', desc, flags=re.IGNORECASE)
+        desc = re.sub(r'[^.!?<>\n\r]*(?:garant[íi]a|warranty|devoluci[óo]n|posventa|postventa)[^.!?<>\n\r]*[.!?]?', '', desc, flags=re.IGNORECASE)
+        desc = re.sub(r'[^.!?<>\n\r]*(?:env[íi]o desde almac[ée]n|env[íi]o r[áa]pido|env[íi]o en 3-5|almac[ée]n espa[ñn]a)[^.!?<>\n\r]*[.!?]?', '', desc, flags=re.IGNORECASE)
+        return desc.strip()
 
     @classmethod
     def format_sku(cls, raw_sku: str) -> str:

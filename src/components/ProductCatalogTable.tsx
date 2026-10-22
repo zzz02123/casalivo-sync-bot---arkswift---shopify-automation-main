@@ -123,20 +123,26 @@ export const ProductCatalogTable: React.FC<ProductCatalogTableProps> = ({
             <Layers className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                 <span>主体 Listing 与智能变体归集架构</span>
                 <span className="text-[10px] bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 px-2 py-0.5 rounded-full font-bold">
                   Aosom 母子关系引擎生效中
                 </span>
               </h3>
+              <span className="text-[10px] bg-sky-500/20 text-sky-200 border border-sky-400/30 px-2 py-0.5 rounded-full font-bold font-mono">
+                EAN-13: ean:84157926XXXXC (全量配置)
+              </span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 px-2 py-0.5 rounded-full font-bold">
+                描述纯净化: 运输与售后已剥离
+              </span>
             </div>
             <p className="text-xs text-slate-300 mt-1 leading-relaxed">
               针对 Aosom 供应商表格<strong>无母子关系表</strong>的特征，系统已自动按型号根码、规格尺寸（
               <code className="text-amber-300 font-mono">Tamaño</code>）与颜色（
               <code className="text-amber-300 font-mono">Color</code>
               ）识别聚类为<strong>主体 Listing</strong>。上传后台时为<strong>单一商品（1个 Listing）</strong>
-              ，详情页自动注入【变体参数对比表】突破 Shopify 限制，Aosom 英文三级类目已写入 Tag，吊牌划线价符合 GMC 规范。
+              。每个变体均已赋予符合标准的 13 位 EAN 条码（国家码 841 + 厂商代码 57926 + 随机 4 位 + 模10校验位，加前缀 <code className="text-sky-300 font-mono">ean:</code>），商品描述（Body HTML）纯净化处理，不写运输与售后政策。
             </p>
           </div>
         </div>
@@ -196,7 +202,7 @@ export const ProductCatalogTable: React.FC<ProductCatalogTableProps> = ({
           >
             <option value="all">全部上架状态</option>
             <option value="synced">已上架 (线上)</option>
-            <option value="unsynced">草稿待推</option>
+            <option value="unsynced">待同步至Shopify (Active)</option>
           </select>
 
           <div className="flex items-center gap-1 border-l border-slate-800 pl-2">
@@ -274,7 +280,8 @@ export const ProductCatalogTable: React.FC<ProductCatalogTableProps> = ({
               <th className="py-3 px-2 w-10 text-center">展开</th>
               <th className="py-3 px-3 w-16">主图</th>
               <th className="py-3 px-3 min-w-[320px]">主体 SEO 商品标题 &amp; 目录/标签映射</th>
-              <th className="py-3 px-3 w-40">变体归集规格</th>
+              <th className="py-3 px-3 w-36">变体归集规格</th>
+              <th className="py-3 px-3 w-44">EAN-13 条形码 (Barcode)</th>
               <th className="py-3 px-3 w-36">聚合售价区间</th>
               <th className="py-3 px-3 w-28">总可售库存</th>
               <th className="py-3 px-3 w-24 text-center">Shopify 状态</th>
@@ -395,6 +402,27 @@ export const ProductCatalogTable: React.FC<ProductCatalogTableProps> = ({
                       </div>
                     </td>
 
+                    {/* EAN-13 Barcode */}
+                    <td className="py-3.5 px-3">
+                      <div className="font-mono text-xs font-semibold text-sky-400 flex items-center gap-1.5">
+                        <span className="bg-sky-950/80 border border-sky-800/80 px-2 py-0.5 rounded text-[11px] text-sky-300 font-mono tracking-tight select-all">
+                          {listing.variants[0]?.barcode || 'ean:84157926...'}
+                        </span>
+                        {isMulti && (
+                          <span
+                            onClick={() => toggleExpandListing(listing.id)}
+                            className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded cursor-pointer hover:bg-slate-700 hover:text-white transition"
+                            title="展开查看所有子变体的专属 EAN 条码"
+                          >
+                            +{listing.variants.length - 1}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                        国家码 841 • 厂商 57926
+                      </div>
+                    </td>
+
                     {/* Price Range & GMC Status */}
                     <td className="py-3.5 px-3">
                       <div className="font-mono font-bold text-amber-400 text-sm">
@@ -425,16 +453,16 @@ export const ProductCatalogTable: React.FC<ProductCatalogTableProps> = ({
                     {/* Shopify Status */}
                     <td className="py-3.5 px-3 text-center">
                       {listing.syncStatus === 'success' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium">
-                          <CheckCircle2 className="w-3 h-3" /> 已上架
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium" title="已成功推送至 Shopify 后台，状态为 Active">
+                          <CheckCircle2 className="w-3 h-3" /> 已上架 (Active)
                         </span>
                       ) : listing.syncStatus === 'pending' ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-medium">
                           <RefreshCw className="w-3 h-3 animate-spin" /> 上传中
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[11px]">
-                          草稿待推
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-700/70 text-[11px] font-medium" title="全量商品状态为 Active（含0库存商品，后续通过库存表单独更新）">
+                          Active (待推)
                         </span>
                       )}
                     </td>
@@ -473,7 +501,7 @@ export const ProductCatalogTable: React.FC<ProductCatalogTableProps> = ({
                   {/* Sub-row: Child Variants Expansion Table */}
                   {isExpanded && (
                     <tr className="bg-slate-950/80 border-b border-slate-800">
-                      <td colSpan={9} className="p-3 pl-14 pr-6">
+                      <td colSpan={10} className="p-3 pl-14 pr-6">
                         <div className="bg-slate-900/90 rounded-xl border border-indigo-900/40 p-3.5 space-y-2.5">
                           <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                             <span className="flex items-center gap-2 text-indigo-300">

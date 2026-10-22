@@ -60,15 +60,15 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
         </div>
       </div>
 
-      {/* 3. Low/Zero Stock Alert */}
+      {/* 3. Product Status */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-sm">
         <div className="flex items-center justify-between text-slate-400 mb-1.5">
-          <span className="text-xs font-medium">库存熔断保护</span>
-          <ShieldAlert className="w-4 h-4 text-amber-400" />
+          <span className="text-xs font-medium">全量商品状态</span>
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
         </div>
-        <div className="text-2xl font-bold text-amber-400 tracking-tight">{lowStockCount}</div>
+        <div className="text-2xl font-bold text-emerald-400 tracking-tight">Active</div>
         <div className="text-[11px] text-slate-400 mt-0.5">
-          低余量自动下架/置0
+          含0库存全部上架 (库存后续单独更新)
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import { CleansedProduct, ArkSwiftRawItem, GroupedProductListing, GroupedProductVariant } from '../types';
+import { generateEan13Barcode, isValidEanBarcode, stripShippingAndWarranty } from './whitewashEngine';
 
 /**
  * Standard Shopify Product CSV Header specification
@@ -250,12 +251,16 @@ export function groupProductsIntoListings(
         listPrice: p.listPrice,
         esShippingFee: p.esShippingFee,
         weight: raw?.weight,
-        barcode: p.barcode || raw?.barcode,
+        barcode: isValidEanBarcode(p.barcode)
+          ? p.barcode
+          : isValidEanBarcode(raw?.barcode)
+          ? raw!.barcode!
+          : generateEan13Barcode(p.originalSku || p.sku),
         image: p.images[0] || '',
       };
     });
 
-    // Build variants matrix HTML
+    // Build variants matrix HTML (technical specs only, no shipping/warranty)
     const matrixData = variants.map((v, i) => ({
       product: group[i],
       optionVal: v.optionValue,
@@ -263,14 +268,10 @@ export function groupProductsIntoListings(
     }));
     const matrixHtml = buildVariantsComparisonMatrix(matrixData);
 
-    // Merge description HTML
-    let fullDescHtml = first.descriptionHtml || `<p>${listingTitle}</p>`;
+    // Merge description HTML: Strip any shipping & warranty completely
+    let fullDescHtml = stripShippingAndWarranty(first.descriptionHtml || `<p>${listingTitle}</p>`);
     if (isMultiVariant && matrixHtml && !fullDescHtml.includes('casalivo-variants-matrix')) {
-      if (fullDescHtml.includes('casalivo-guarantee')) {
-        fullDescHtml = fullDescHtml.replace('<div class="casalivo-guarantee"', `${matrixHtml}\n<div class="casalivo-guarantee"`);
-      } else {
-        fullDescHtml += `\n${matrixHtml}`;
-      }
+      fullDescHtml += `\n${matrixHtml}`;
     }
 
     // Merge tags
@@ -312,7 +313,7 @@ export function groupProductsIntoListings(
       images: allImages.length > 0 ? allImages : first.images,
       descriptionHtml: fullDescHtml,
       seoTitle: listingTitle.slice(0, 70),
-      seoDescription: `${listingTitle} - Colección oficial Casalivo. Envío rápido garantizado.`.slice(0, 160),
+      seoDescription: `${listingTitle} - Colección oficial Casalivo.`.slice(0, 160),
       syncStatus: group.every((p) => p.syncStatus === 'success')
         ? 'success'
         : group.some((p) => p.syncStatus === 'pending')
@@ -373,7 +374,7 @@ export function convertToShopifyCsvRows(
           'Variant Compare At Price': v.compareAtPrice > 0 ? v.compareAtPrice.toFixed(2) : '',
           'Variant Requires Shipping': 'TRUE',
           'Variant Taxable': 'FALSE',
-          'Variant Barcode': v.barcode || '',
+          'Variant Barcode': (isValidEanBarcode(v.barcode) ? v.barcode : generateEan13Barcode(v.sku || v.originalSku)) || '',
           'Image Src': listing.images[vIdx] || listing.images[0] || '',
           'Image Position': (vIdx + 1).toString(),
           'Image Alt Text': isFirst ? listing.title : `${listing.title} - ${v.optionValue}`,
@@ -450,14 +451,19 @@ export function convertToShopifyCsvRows(
     const handle = generateHandle(product.title, product.sku);
     const weightKg = raw?.weight || 1.0;
     const grams = Math.round(weightKg * 1000).toString();
-    const barcode = product.barcode || raw?.barcode || '';
+    const barcode: string = (isValidEanBarcode(product.barcode)
+      ? product.barcode
+      : isValidEanBarcode(raw?.barcode)
+      ? raw!.barcode
+      : generateEan13Barcode(product.sku || product.originalSku)) || '';
     const images = product.images && product.images.length > 0 ? product.images : [];
+    const cleanDesc = stripShippingAndWarranty(product.descriptionHtml || `<p>${product.title}</p>`);
 
     // Main variant row (first row contains full product info)
     const mainRow: ShopifyCsvRow = {
       Handle: handle,
       Title: product.title,
-      'Body (HTML)': product.descriptionHtml || `<p>${product.title}</p>`,
+      'Body (HTML)': cleanDesc,
       Vendor: product.vendor || 'Casalivo',
       // Requirement 2: Auto-mapped 1st/2nd level taxonomy, NEVER left empty!
       'Product Category': product.shopifyCategory || 'Home & Garden > Lawn & Garden',
@@ -488,7 +494,7 @@ export function convertToShopifyCsvRows(
       'Image Alt Text': product.title,
       'Gift Card': 'FALSE',
       'SEO Title': product.title.slice(0, 70),
-      'SEO Description': (product.title + ' - Colección exclusiva Casalivo. Envío rápido y garantía de calidad.').slice(0, 160),
+      'SEO Description': (product.title + ' - Colección exclusiva Casalivo.').slice(0, 160),
       'Google Shopping / Google Product Category': product.googleProductCategory || product.shopifyCategory || '',
       'Google Shopping / Gender': '',
       'Google Shopping / Age Group': '',
@@ -499,7 +505,7 @@ export function convertToShopifyCsvRows(
       'Variant Image': images[0] || '',
       'Variant Weight Unit': 'kg',
       'Cost per item': product.costPrice ? product.costPrice.toFixed(2) : '',
-      Status: product.status || 'active',
+      Status: 'active',
     };
 
     rows.push(mainRow);

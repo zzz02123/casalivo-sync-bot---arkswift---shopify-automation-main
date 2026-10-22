@@ -175,7 +175,7 @@ export default function App() {
     const filename = `casalivo_shopify_master_listings_${new Date().toISOString().slice(0, 10)}.csv`;
     downloadShopifyCsv(targetProducts, rawItemsMap, filename, { mode: 'grouped_variants' });
     setSyncLogs((prev) => [
-      `[${new Date().toLocaleTimeString()}] 📥 成功导出 Shopify 官方标准多变体聚合 CSV (主体Listing下包含全部变体，Tag写入英文三级类目，1-2级标准目录自动映射，吊牌划线价符合GMC规范)`,
+      `[${new Date().toLocaleTimeString()}] 📥 成功导出 Shopify 官方标准多变体聚合 CSV (主体Listing下包含全部变体，每个变体全量生成 13 位 EAN 条码 ean:84157926...，商品描述纯净化剔除运输与售后条款)`,
       ...prev,
     ]);
   };

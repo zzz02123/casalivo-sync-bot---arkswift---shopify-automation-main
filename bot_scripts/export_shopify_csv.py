@@ -70,13 +70,15 @@ def clean_text(text: str) -> str:
     return result
 
 def clean_description(desc: str) -> str:
-    cleaned = clean_text(desc or "")
-    guarantee_box = (
-        f'<div class="casalivo-guarantee" style="margin-top:20px;padding:15px;background:#f8fafc;border-left:4px solid #0f172a;">'
-        f'<p><strong>{BRAND_NAME} 质保说明:</strong> 欧洲本地极速发货，全检出库，提供专属无忧售后保障。</p>'
-        f'</div>'
-    )
-    return cleaned + guarantee_box
+    raw = desc or ""
+    # 纯净描述：彻底剔除整句的售后质保、官方店铺、发货运输条款
+    raw = re.sub(r'<div[^>]*class="[^"]*(?:casalivo-guarantee|casalivo-shipping|casalivo-warranty|guarantee)[^"]*"[^>]*>[\s\S]*?</div>', '', raw, flags=re.IGNORECASE)
+    raw = re.sub(r'[^.!?<>\n\r]*(?:garant[íi]a|warranty|devoluci[óo]n|posventa|postventa|fabricante oficial|tienda oficial)[^.!?<>\n\r]*[.!?]?', '', raw, flags=re.IGNORECASE)
+    raw = re.sub(r'[^.!?<>\n\r]*(?:env[íi]o|almac[ée]n espa[ñn]a|almac[ée]n europeo|plazo de entrega)[^.!?<>\n\r]*[.!?]?', '', raw, flags=re.IGNORECASE)
+    cleaned = clean_text(raw)
+    cleaned = re.sub(r'\s+([.,;:!?])', r'\1', cleaned)
+    cleaned = re.sub(r'\b(de|en|con|para)\s*\.', '.', cleaned)
+    return cleaned.strip()
 
 def generate_handle(title: str, sku: str) -> str:
     import unicodedata
@@ -122,7 +124,7 @@ SPANISH_PRODUCTS = [
             "https://images.unsplash.com/photo-1615066390971-03e4e1c36ddf?auto=format&fit=crop&w=800&q=80",
             "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&w=800&q=80"
         ],
-        "description": "HOMCOM mesa de comedor moderna ideal para cocinas y pisos pequeños. Cuenta con dos alas abatibles y ruedas giratorias con freno. Garantía del fabricante oficial en almacén España."
+        "description": "HOMCOM mesa de comedor moderna ideal para cocinas y pisos pequeños. Cuenta con dos alas abatibles y ruedas giratorias con freno. Medidas: 140x80x74cm."
     },
     {
         "sku": "833-855",
@@ -292,7 +294,7 @@ def export_shopify_csv(output_filepath: str = "shopify_cleansed_spanish_products
                 "Image Alt Text": title,
                 "Gift Card": "FALSE",
                 "SEO Title": title[:70],
-                "SEO Description": (title + " - Envío rápido y garantía de calidad.").strip()[:160],
+                "SEO Description": (title + " - Colección oficial Casalivo.").strip()[:160],
                 "Google Shopping / MPN": brand_sku,
                 "Google Shopping / Condition": "new",
                 "Google Shopping / Custom Product": "FALSE",
@@ -300,7 +302,7 @@ def export_shopify_csv(output_filepath: str = "shopify_cleansed_spanish_products
                 "Variant Image": images[0] if images else "",
                 "Variant Weight Unit": "kg",
                 "Cost per item": f"{item['cost']:.2f}",
-                "Status": "active" if avail_stock > 0 else "draft"
+                "Status": "active"
             }
             writer.writerow(main_row)
 

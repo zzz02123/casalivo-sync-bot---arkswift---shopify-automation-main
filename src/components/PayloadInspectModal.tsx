@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Code, Copy, Check, Terminal, Layers } from 'lucide-react';
 import { CleansedProduct, GroupedProductListing, ShopifyConfig } from '../types';
+import { generateEan13Barcode, isValidEanBarcode } from '../utils/whitewashEngine';
 
 interface PayloadInspectModalProps {
   product: CleansedProduct | null;
@@ -47,7 +48,7 @@ export const PayloadInspectModal: React.FC<PayloadInspectModalProps> = ({
             inventory_policy: 'deny',
             fulfillment_service: 'manual',
             requires_shipping: true,
-            barcode: v.barcode || null,
+            barcode: isValidEanBarcode(v.barcode) ? v.barcode : generateEan13Barcode(v.sku),
           })),
         },
         inventory_adjustments: listing!.variants.map((v) => ({
@@ -76,7 +77,7 @@ export const PayloadInspectModal: React.FC<PayloadInspectModalProps> = ({
               inventory_policy: 'deny',
               fulfillment_service: 'manual',
               requires_shipping: true,
-              barcode: product!.barcode || null,
+              barcode: isValidEanBarcode(product!.barcode) ? product!.barcode : generateEan13Barcode(product!.sku),
             },
           ],
         },

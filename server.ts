@@ -67,6 +67,44 @@ export function calculateArkSwiftSignature(
   return { signString, signature };
 }
 
+// --- EAN-13 Barcode & Description Hygiene Helpers ---
+export function ensureEan13Barcode(barcode?: string, seed?: string): string {
+  if (barcode && barcode.startsWith('ean:84157926') && barcode.length === 17) {
+    return barcode;
+  }
+  const countryCode = '841';
+  const manufacturerCode = '57926';
+  let num = Math.floor(Math.random() * 10000);
+  if (seed) {
+    let hash = 2166136261;
+    for (let i = 0; i < seed.length; i++) {
+      hash ^= seed.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    num = Math.abs(hash % 10000);
+  }
+  const itemDigits = String(num).padStart(4, '0');
+  const first12 = `${countryCode}${manufacturerCode}${itemDigits}`;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const digit = parseInt(first12[i], 10);
+    sum += i % 2 === 0 ? digit : digit * 3;
+  }
+  const remainder = sum % 10;
+  const checkDigit = remainder === 0 ? 0 : 10 - remainder;
+  return `ean:${first12}${checkDigit}`;
+}
+
+export function sanitizeDescription(desc: string = ''): string {
+  if (!desc) return '';
+  let out = desc;
+  out = out.replace(/<div[^>]*class="[^"]*(?:casalivo-guarantee|casalivo-shipping|casalivo-warranty|guarantee|warranty|shipping)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+  out = out.replace(/<div[^>]*>[\s\S]*?(?:Envío y servicio|Garantía Casalivo|Garantía:|Atención al cliente|30 días para devoluciones)[\s\S]*?<\/div>/gi, '');
+  out = out.replace(/[^.!?<>\n\r]*(?:garant[íi]a del fabricante|manufacturer warranty|garant[íi]a oficial|devoluci[óo]n|devoluciones|posventa|postventa|after-sales)[^.!?<>\n\r]*[.!?]?/gi, '');
+  out = out.replace(/[^.!?<>\n\r]*(?:env[íi]o desde almac[ée]n|env[íi]o r[áa]pido|env[íi]o en 3-5|almac[ée]n espa[ñn]a|almac[ée]n europeo)[^.!?<>\n\r]*[.!?]?/gi, '');
+  return out.trim();
+}
+
 // --- API Endpoints ---
 
 // 1. Health check
@@ -329,7 +367,7 @@ app.post('/api/shopify/publish-product', async (req: Request, res: Response) => 
 
     const input: any = {
       title: product.title,
-      descriptionHtml: product.descriptionHtml || `<p>${product.description || product.title}</p>`,
+      descriptionHtml: sanitizeDescription(product.descriptionHtml || `<p>${product.description || product.title}</p>`),
       vendor: product.vendor || 'Casalivo',
       productType: product.category || product.productType || 'Home & Living',
       tags: finalTags,
@@ -342,6 +380,7 @@ app.post('/api/shopify/publish-product', async (req: Request, res: Response) => 
       taxable: product.taxable !== false,
       // 2025-07 moved `sku` off ProductVariantsBulkInput onto InventoryItemInput
       inventoryItem: { sku: product.sku, tracked: true },
+      barcode: ensureEan13Barcode(product.barcode, product.sku),
     };
     // GMC policy protection: only send compareAtPrice if positive and enabled
     if (product.compareAtPrice && Number(product.compareAtPrice) > 0) {
@@ -352,7 +391,6 @@ app.post('/api/shopify/publish-product', async (req: Request, res: Response) => 
     if (product.weight) {
       variantInput.inventoryItem.measurement = { weight: { value: Number(product.weight), unit: 'KILOGRAMS' } };
     }
-    if (product.barcode) variantInput.barcode = product.barcode;
 
     let productId: string;
     let action: string;
@@ -444,7 +482,7 @@ app.post('/api/shopify/publish-listing', async (req: Request, res: Response) => 
 
     const input: any = {
       title: listing.title,
-      descriptionHtml: listing.descriptionHtml || `<p>${listing.title}</p>`,
+      descriptionHtml: sanitizeDescription(listing.descriptionHtml || `<p>${listing.title}</p>`),
       vendor: listing.vendor || 'Casalivo',
       productType: listing.category || 'Home & Living',
       tags: finalTags,
@@ -488,6 +526,7 @@ app.post('/api/shopify/publish-listing', async (req: Request, res: Response) => 
         inventoryPolicy: 'DENY',
         taxable: true,
         inventoryItem: { sku: v.sku, tracked: true },
+        barcode: ensureEan13Barcode(v.barcode, v.sku),
       };
       if (v.compareAtPrice && Number(v.compareAtPrice) > 0) {
         vInput.compareAtPrice = Number(v.compareAtPrice).toFixed(2);
@@ -497,7 +536,6 @@ app.post('/api/shopify/publish-listing', async (req: Request, res: Response) => 
       if (v.weight) {
         vInput.inventoryItem.measurement = { weight: { value: Number(v.weight), unit: 'KILOGRAMS' } };
       }
-      if (v.barcode) vInput.barcode = v.barcode;
 
       // Find an existing variant matching SKU or the first unused existing variant
       let match = existingVariants.find((ev: any) => ev.sku === v.sku && !usedExistingIds.has(ev.id));

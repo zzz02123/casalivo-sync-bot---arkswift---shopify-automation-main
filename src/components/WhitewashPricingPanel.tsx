@@ -532,6 +532,55 @@ export const WhitewashPricingPanel: React.FC<WhitewashPricingPanelProps> = ({
               </div>
             </div>
 
+            {/* EAN-13 Barcode & Clean Description Hygiene Card */}
+            <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-sky-500/20 text-sky-400 rounded-lg">
+                    <Tag className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">
+                      EAN-13 国际条形码与描述纯净化规则 (Barcode &amp; Description Hygiene)
+                    </h4>
+                    <p className="text-[10px] text-slate-400">
+                      严格遵循用户定制的 EAN-13 生成规则与独立站政策分离规范
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded font-mono font-bold">
+                  规则已生效
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 bg-slate-900/90 rounded-lg border border-slate-800">
+                  <div className="text-sky-400 font-bold flex items-center gap-1.5 mb-1">
+                    <span>📦 13位 EAN 条形码规则 (Barcode)</span>
+                  </div>
+                  <ul className="text-slate-400 text-[11px] space-y-1 list-disc list-inside">
+                    <li><strong className="text-white">国家代码:</strong> 841 (西班牙)</li>
+                    <li><strong className="text-white">厂商代码:</strong> 57926</li>
+                    <li><strong className="text-white">商品代码:</strong> 4位随机数字</li>
+                    <li><strong className="text-white">校验码:</strong> GS1 Modulo-10 标准算法</li>
+                    <li><strong className="text-white">格式前缀:</strong> 带 <code className="text-amber-300 font-mono">ean:</code> (如 <code className="text-emerald-400 font-mono">ean:8415792615295</code>)</li>
+                  </ul>
+                </div>
+
+                <div className="p-3 bg-slate-900/90 rounded-lg border border-slate-800">
+                  <div className="text-emerald-400 font-bold flex items-center gap-1.5 mb-1">
+                    <span>🚫 纯净商品描述：运输与售后不写在描述里</span>
+                  </div>
+                  <ul className="text-slate-400 text-[11px] space-y-1 list-disc list-inside">
+                    <li><strong className="text-white">去运输化:</strong> 彻底剔除发货、快递、时效等语句</li>
+                    <li><strong className="text-white">去售后化:</strong> 剔除原厂质保、保修、退换等条款</li>
+                    <li><strong className="text-white">职责分离:</strong> 运输由独立站 Shipping Policy 统一展示</li>
+                    <li><strong className="text-white">避免冲突:</strong> 售后由 Refund Policy 统一承载，避免描述臃肿</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             {/* Category & Tags Automation Card */}
             <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
               <div className="flex items-center gap-2">
