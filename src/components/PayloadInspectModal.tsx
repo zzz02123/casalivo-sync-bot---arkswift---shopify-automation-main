@@ -76,6 +76,7 @@ export const PayloadInspectModal: React.FC<PayloadInspectModalProps> = ({
               inventory_policy: 'deny',
               fulfillment_service: 'manual',
               requires_shipping: true,
+              barcode: product!.barcode || null,
             },
           ],
         },

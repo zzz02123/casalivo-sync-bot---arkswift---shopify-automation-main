@@ -329,11 +329,11 @@ export function resolveShopifyTaxonomy(rawCategory: string = '', rawTitle: strin
 
 export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   tiers: [
-    { id: 'tier-1', name: 'Low Cost (< €20)', minCost: 0, maxCost: 20, multiplier: 2.5, flatFee: 0 },
-    { id: 'tier-2', name: 'Mid Cost (€20 - €50)', minCost: 20, maxCost: 50, multiplier: 2.0, flatFee: 0 },
-    { id: 'tier-3', name: 'High Cost (> €50)', minCost: 50, maxCost: 999999, multiplier: 1.8, flatFee: 0 },
+    { id: 'tier-1', name: '≤ €100 (1.55x)', minCost: 0, maxCost: 100, multiplier: 1.55, flatFee: 0 },
+    { id: 'tier-2', name: '€100 - €200 (1.50x)', minCost: 100, maxCost: 200, multiplier: 1.5, flatFee: 0 },
+    { id: 'tier-3', name: '> €200 (1.45x)', minCost: 200, maxCost: 999999, multiplier: 1.45, flatFee: 0 },
   ],
-  rounding: '99',
+  rounding: 'none', // 默认保留原计算两位小数，确保严格遵循 1.55x / 1.5x / 1.45x
   enableCompareAtPrice: false, // 默认关闭吊牌划线价，防止被 GMC 判定虚假促销
   compareAtMultiplier: 1.35,
   shippingFee: 0,
@@ -342,6 +342,10 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
 
 /**
  * Calculates selling price, compare-at price, and profit margin
+ * Rule: 将 Aosom 表格中的 list price 和 ES shipping fee 相加：
+ *   - 结果 <= 100: 乘以 1.55 倍
+ *   - 结果 100 到 200: 乘以 1.50 倍
+ *   - 结果 200 以上: 乘以 1.45 倍
  */
 export function calculatePricing(
   costPrice: number,
@@ -364,8 +368,20 @@ export function calculatePricing(
     };
   }
 
-  // Find matching tier
-  const tier = config.tiers.find((t) => cost >= t.minCost && cost < t.maxCost) || config.tiers[config.tiers.length - 1];
+  // Find matching tier based on cost (<= 100: 1.55x, 100~200: 1.50x, > 200: 1.45x)
+  const tier =
+    config.tiers.find((t, idx) => {
+      if (idx === 0) {
+        return cost <= t.maxCost;
+      }
+      const prevMax = config.tiers[idx - 1].maxCost;
+      if (idx === config.tiers.length - 1) {
+        return cost > prevMax;
+      }
+      return cost > prevMax && cost <= t.maxCost;
+    }) ||
+    config.tiers.find((t) => cost >= t.minCost && cost <= t.maxCost) ||
+    config.tiers[config.tiers.length - 1];
 
   let rawPrice = cost * tier.multiplier + tier.flatFee + config.shippingFee;
   if (config.taxRatePercent > 0) {
@@ -500,6 +516,45 @@ export function generateBrandSku(
 }
 
 /**
+ * Generates an official 13-digit EAN barcode with 'ean:' prefix:
+ * - Country Code (3 digits): 841 (Spain)
+ * - Manufacturer Code (5 digits): 57926
+ * - Item Code (4 digits): pseudo-random / random 4 digits
+ * - Checksum Digit (1 digit): standard GS1 modulo 10 algorithm
+ * Example: ean:8415792615295
+ */
+export function generateEan13Barcode(seed?: string): string {
+  const countryCode = '841';
+  const manufacturerCode = '57926';
+
+  let itemDigits = '';
+  if (seed) {
+    let hash = 2166136261;
+    for (let i = 0; i < seed.length; i++) {
+      hash ^= seed.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    const num = Math.abs(hash % 9000) + 1000;
+    itemDigits = String(num).padStart(4, '0');
+  } else {
+    itemDigits = String(Math.floor(1000 + Math.random() * 9000));
+  }
+
+  const first12 = `${countryCode}${manufacturerCode}${itemDigits}`;
+
+  // GS1 modulo 10 checksum
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const digit = parseInt(first12[i], 10);
+    sum += i % 2 === 0 ? digit : digit * 3;
+  }
+  const remainder = sum % 10;
+  const checkDigit = remainder === 0 ? 0 : 10 - remainder;
+
+  return `ean:${first12}${checkDigit}`;
+}
+
+/**
  * Converts a raw ArkSwift item into a cleansed Casalivo product
  */
 export function transformArkSwiftItem(
@@ -510,7 +565,12 @@ export function transformArkSwiftItem(
   const brandSku = generateBrandSku(item.originalSku, whitewashConfig);
   const cleanTitleStr = cleanseTitle(item.originalTitle, whitewashConfig);
   const cleanDescHtml = cleanseDescription(item.description, whitewashConfig);
-  const pricing = calculatePricing(item.originalPrice, pricingConfig);
+  // 基础成本：将 Aosom 表格中的 list price 和 ES shipping fee 相加
+  const listPrice = Number(item.listPrice !== undefined ? item.listPrice : item.originalPrice) || 0;
+  const esShippingFee = Number(item.esShippingFee) || 0;
+  const baseCost = listPrice + esShippingFee;
+
+  const pricing = calculatePricing(baseCost, pricingConfig);
 
   // 1. Resolve Shopify 1st/2nd level taxonomy & English category
   const rawEnglishCat = (item.englishCategory || item.category || '').trim();
@@ -529,6 +589,12 @@ export function transformArkSwiftItem(
     tagSet.add(item.mainColor);
   }
 
+  // 3. EAN-13 码生成 (国家码 841，厂商代码 57926，随机4位项目码 + 校验位，加前缀 ean:)
+  let barcode = item.barcode;
+  if (!barcode || !barcode.startsWith('ean:84157926') || barcode.length !== 17) {
+    barcode = generateEan13Barcode(item.originalSku || item.id);
+  }
+
   // Safety buffer calculation
   const buffer = whitewashConfig.safetyStockBuffer || 0;
   const rawStock = Number(item.stock) || 0;
@@ -542,7 +608,9 @@ export function transformArkSwiftItem(
     originalTitle: item.originalTitle,
     vendor: whitewashConfig.brandName,
     originalVendor: item.originalVendor || 'SPANISH AOSOM SL',
-    costPrice: item.originalPrice,
+    costPrice: Math.round(baseCost * 100) / 100,
+    listPrice: Math.round(listPrice * 100) / 100,
+    esShippingFee: Math.round(esShippingFee * 100) / 100,
     price: pricing.sellingPrice,
     compareAtPrice: pricing.compareAtPrice, // 0 when disabled (GMC safety)
     profitMargin: pricing.profitMargin,
@@ -558,6 +626,7 @@ export function transformArkSwiftItem(
     googleProductCategory: taxonomy.googleProductCategory,
     mainColor: item.mainColor,
     dimensions: item.dimensions,
+    barcode,
     tags: Array.from(tagSet),
     descriptionHtml: cleanDescHtml,
     status: availableStock > 0 ? 'active' : 'draft',

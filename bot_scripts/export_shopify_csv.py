@@ -8,10 +8,11 @@ import os
 import re
 import csv
 import sys
-import json
-from dotenv import load_dotenv
-
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 # Casalivo Whitewash Rules
 BRAND_NAME = "Casalivo"
@@ -40,26 +41,21 @@ BANNED_KEYWORDS = [
 
 def calculate_price(cost: float) -> dict:
     cost = float(cost)
-    if cost < 20:
-        multiplier = 2.5
-    elif cost <= 50:
-        multiplier = 2.0
+    if cost <= 0:
+        return {"price": 0.0, "compare_at_price": 0.0}
+    if cost <= 100:
+        multiplier = 1.55
+    elif cost <= 200:
+        multiplier = 1.50
     else:
-        multiplier = 1.8
+        multiplier = 1.45
 
-    raw_selling = cost * multiplier
-    selling_price = int(raw_selling) + 0.99
-    if selling_price < raw_selling:
-        selling_price += 1.0
-
-    raw_compare = selling_price * 1.35
-    compare_at = int(raw_compare) + 0.99
-    if compare_at <= selling_price:
-        compare_at = selling_price + 10.0
+    selling_price = round(cost * multiplier, 2)
+    compare_at = round(selling_price * 1.35, 2)
 
     return {
-        "price": round(selling_price, 2),
-        "compare_at_price": round(compare_at, 2)
+        "price": selling_price,
+        "compare_at_price": compare_at
     }
 
 def clean_text(text: str) -> str:
@@ -88,6 +84,28 @@ def generate_handle(title: str, sku: str) -> str:
     clean_t = re.sub(r'[^a-z0-9]+', '-', norm).strip('-')[:50]
     clean_s = re.sub(r'[^a-z0-9]+', '-', sku.lower()).strip('-')
     return f"{clean_s}-{clean_t}".strip('-')
+
+def generate_ean13_barcode(seed: str = None) -> str:
+    """
+    生成13位EAN码，国家码841，厂商代码57926，前缀加上 ean:
+    例如: ean:8415792615295
+    """
+    import hashlib, random
+    if seed:
+        h = int(hashlib.md5(str(seed).encode("utf-8")).hexdigest()[:8], 16)
+        item_code_num = h % 10000
+    else:
+        item_code_num = random.randint(0, 9999)
+    item_code = f"{item_code_num:04d}"
+    raw12 = f"84157926{item_code}"
+    
+    # GS1 Modulo 10:
+    s = 0
+    for i, ch in enumerate(raw12):
+        w = 1 if i % 2 == 0 else 3
+        s += int(ch) * w
+    check_digit = (10 - (s % 10)) % 10
+    return f"ean:{raw12}{check_digit}"
 
 # Spanish catalog demo data
 SPANISH_PRODUCTS = [
@@ -268,7 +286,7 @@ def export_shopify_csv(output_filepath: str = "shopify_cleansed_spanish_products
                 "Variant Compare At Price": f"{pricing['compare_at_price']:.2f}",
                 "Variant Requires Shipping": "TRUE",
                 "Variant Taxable": "FALSE",
-                "Variant Barcode": item.get("barcode", ""),
+                "Variant Barcode": generate_ean13_barcode(item['sku']),
                 "Image Src": images[0] if images else "",
                 "Image Position": "1" if images else "",
                 "Image Alt Text": title,

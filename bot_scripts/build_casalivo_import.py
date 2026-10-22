@@ -171,12 +171,15 @@ def slug(text: str, limit: int = 55) -> str:
 def pricing(cost: float) -> Dict[str, float]:
     if cost <= 0:
         return {"price": 0.0, "compare_at_price": 0.0, "profit": 0.0, "margin": 0.0}
-    mult = 2.5 if cost < 20 else (2.0 if cost <= 50 else 1.8)
+    if cost <= 100:
+        mult = 1.55
+    elif cost <= 200:
+        mult = 1.50
+    else:
+        mult = 1.45
     raw = cost * mult
-    price = math.floor(raw) + 0.99
-    if price < raw:
-        price += 1.0
-    compare = math.floor(price * 1.35) + 0.99
+    price = round(raw, 2)
+    compare = round(price * 1.35, 2)
     return {
         "price": round(price, 2),
         "compare_at_price": round(compare, 2),
@@ -320,7 +323,9 @@ def main() -> None:
         if not sku:
             continue
         qty = int(num(inv.get("Qty Available")))
-        cost = money(inv.get("List Price (Excl. Tax)"))
+        list_price = money(inv.get("List Price (Excl. Tax)") or inv.get("List Price"))
+        shipping_fee = money(inv.get("ES Shipping Fee") or inv.get("ES Shipping Fee (Excl. Tax)") or inv.get("Shipping Fee") or 0)
+        cost = list_price + shipping_fee
         if qty <= SAFETY_BUFFER:
             skipped.append({"sku": sku, "reason": f"qty {qty} <= buffer {SAFETY_BUFFER}"})
             continue

@@ -219,12 +219,15 @@ def scrub(text: Any, sentences: bool = True, add_period: bool = True) -> str:
 def pricing(cost: float) -> Dict[str, float]:
     if cost <= 0:
         return {"price": 0.0, "compare_at_price": 0.0}
-    mult = 2.5 if cost < 20 else (2.0 if cost <= 50 else 1.8)
+    if cost <= 100:
+        mult = 1.55
+    elif cost <= 200:
+        mult = 1.50
+    else:
+        mult = 1.45
     raw = cost * mult
-    price = math.floor(raw) + 0.99
-    if price < raw:
-        price += 1.0
-    compare = math.floor(price * 1.35) + 0.99
+    price = round(raw, 2)
+    compare = round(price * 1.35, 2)
     return {"price": round(price, 2), "compare_at_price": round(compare, 2)}
 
 
@@ -324,7 +327,10 @@ def build_row(row: List[Any], idx: Dict[str, int], max_images: int,
     name = str(row[idx.get("Product Name (Spanish)")] or row[idx["Product Name"]] or "").strip()
     if not sku or not name:
         return None
-    cost = money(row[idx["List Price (Excl. Tax)"]])
+    list_price = money(row[idx["List Price (Excl. Tax)"]]) if "List Price (Excl. Tax)" in idx else money(row[idx.get("List Price", -1)])
+    shipping_key = next((k for k in idx if re.search(r"shipping\s*fee|flete", k, re.I)), None)
+    shipping_fee = money(row[idx[shipping_key]]) if shipping_key else 0.0
+    cost = list_price + shipping_fee
     qty = int(num(row[idx.get("Qty Available")]))
     images: List[str] = []
     for n in range(1, 13):

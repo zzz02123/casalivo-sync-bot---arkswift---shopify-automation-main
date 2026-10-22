@@ -3,7 +3,9 @@ export interface ArkSwiftRawItem {
   originalSku: string;
   originalTitle: string;
   originalVendor: string;
-  originalPrice: number; // Cost / supply price in EUR
+  originalPrice: number; // Combined base cost in EUR (list price + ES shipping fee)
+  listPrice?: number; // Raw Aosom list price in EUR
+  esShippingFee?: number; // Raw Aosom ES shipping fee in EUR
   stock: number;
   category: string;
   barcode?: string;
@@ -25,7 +27,9 @@ export interface CleansedProduct {
   originalTitle: string;
   vendor: string; // 'Casalivo'
   originalVendor: string;
-  costPrice: number;
+  costPrice: number; // Combined base cost (list price + ES shipping fee) in EUR
+  listPrice?: number; // Raw Aosom list price in EUR
+  esShippingFee?: number; // Raw Aosom ES shipping fee in EUR
   price: number; // Selling price in EUR
   compareAtPrice: number; // Strikethrough MSRP (0 if disabled)
   profitMargin: number; // Percentage, e.g. 52.3%
@@ -39,6 +43,7 @@ export interface CleansedProduct {
   googleProductCategory?: string; // Auto-mapped Google Shopping category for GMC
   mainColor?: string;
   dimensions?: string;
+  barcode?: string; // 13-digit EAN barcode with 'ean:' prefix (e.g. ean:8415792615295)
   tags: string[];
   descriptionHtml: string;
   status: 'active' | 'draft';
@@ -59,6 +64,8 @@ export interface GroupedProductVariant {
   stock: number;
   availableStock: number;
   costPrice: number;
+  listPrice?: number;
+  esShippingFee?: number;
   weight?: number;
   barcode?: string;
   image: string;

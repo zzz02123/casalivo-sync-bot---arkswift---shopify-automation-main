@@ -25,6 +25,7 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
   const displayPrice = currentVariant ? currentVariant.price : product!.price;
   const displayCompareAt = currentVariant ? currentVariant.compareAtPrice : product!.compareAtPrice;
   const displaySku = currentVariant ? currentVariant.sku : product!.sku;
+  const displayBarcode = currentVariant ? currentVariant.barcode : product!.barcode;
   const displayStock = currentVariant ? currentVariant.availableStock : product!.availableStock;
   const displayImages = listing ? listing.images : product!.images;
   const displayImage = currentVariant?.image || displayImages[0];
@@ -99,8 +100,14 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
                 )}
               </div>
               <h2 className="text-lg md:text-xl font-bold text-slate-900 leading-snug">{displayTitle}</h2>
-              <div className="text-xs text-slate-500 font-mono mt-1 flex items-center gap-2">
+              <div className="text-xs text-slate-500 font-mono mt-1 flex flex-wrap items-center gap-2">
                 <span>SKU: <strong className="text-slate-800">{displaySku}</strong></span>
+                {displayBarcode && (
+                  <>
+                    <span>•</span>
+                    <span>EAN: <strong className="text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">{displayBarcode}</strong></span>
+                  </>
+                )}
                 <span>•</span>
                 <span className="text-emerald-600 font-medium flex items-center gap-1">
                   <Check className="w-3.5 h-3.5" /> 现货 ({displayStock} 件)

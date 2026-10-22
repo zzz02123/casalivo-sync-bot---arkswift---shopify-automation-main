@@ -247,8 +247,10 @@ export function groupProductsIntoListings(
         stock: p.stock,
         availableStock: p.availableStock,
         costPrice: p.costPrice,
+        listPrice: p.listPrice,
+        esShippingFee: p.esShippingFee,
         weight: raw?.weight,
-        barcode: raw?.barcode,
+        barcode: p.barcode || raw?.barcode,
         image: p.images[0] || '',
       };
     });
@@ -448,7 +450,7 @@ export function convertToShopifyCsvRows(
     const handle = generateHandle(product.title, product.sku);
     const weightKg = raw?.weight || 1.0;
     const grams = Math.round(weightKg * 1000).toString();
-    const barcode = raw?.barcode || '';
+    const barcode = product.barcode || raw?.barcode || '';
     const images = product.images && product.images.length > 0 ? product.images : [];
 
     // Main variant row (first row contains full product info)

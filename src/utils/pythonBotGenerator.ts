@@ -138,10 +138,16 @@ ${bannedList}
         if cost <= 0:
             return {"price": 0.0, "compare_at_price": 0.0, "profit": 0.0, "margin": 0.0}
 
-        # 匹配对应加价区间
+        # 匹配对应加价区间 (<= 100: 1.55x, 100~200: 1.50x, > 200: 1.45x)
         tier = cls.PRICING_TIERS[-1]
-        for t in cls.PRICING_TIERS:
-            if t["minCost"] <= cost < t["maxCost"]:
+        for idx, t in enumerate(cls.PRICING_TIERS):
+            if idx == 0 and cost <= t.get("maxCost", 100):
+                tier = t
+                break
+            elif idx == len(cls.PRICING_TIERS) - 1:
+                tier = t
+                break
+            elif idx > 0 and cls.PRICING_TIERS[idx - 1].get("maxCost", 0) < cost <= t.get("maxCost", 999999):
                 tier = t
                 break
 
@@ -225,15 +231,48 @@ ${bannedList}
         return f"{cls.SKU_PREFIX}{clean_sku}"
 
     @classmethod
+    def generate_ean13_barcode(cls, seed: str = None) -> str:
+        """
+        生成13位EAN码条形码，前缀为 ean:
+        国家码为 841, 厂商代码为 57926, 4位商品代码根据seed随机/哈希生成, 最后1位为GS1 Modulo 10校验码
+        例如: ean:8415792615295
+        """
+        import hashlib, random
+        if seed:
+            h = int(hashlib.md5(str(seed).encode("utf-8")).hexdigest()[:8], 16)
+            item_code_num = h % 10000
+        else:
+            item_code_num = random.randint(0, 9999)
+        item_code = f"{item_code_num:04d}"
+        raw12 = f"84157926{item_code}"
+        
+        # GS1 Modulo 10 check digit:
+        s = 0
+        for i, ch in enumerate(raw12):
+            w = 1 if i % 2 == 0 else 3
+            s += int(ch) * w
+        check_digit = (10 - (s % 10)) % 10
+        return f"ean:{raw12}{check_digit}"
+
+    @classmethod
     def transform(cls, raw_item: Dict[str, Any]) -> Dict[str, Any]:
         """全流程清洗单个商品"""
         orig_sku = str(raw_item.get("sku") or raw_item.get("originalSku") or "")
         orig_title = str(raw_item.get("title") or raw_item.get("originalTitle") or "")
-        cost = float(raw_item.get("costPrice") or raw_item.get("price") or 0.0)
+        
+        # Cost is listPrice + esShippingFee if provided, else costPrice / price
+        list_price = float(raw_item.get("listPrice") or 0.0)
+        shipping_fee = float(raw_item.get("esShippingFee") or 0.0)
+        if list_price > 0 or shipping_fee > 0:
+            cost = list_price + shipping_fee
+        else:
+            cost = float(raw_item.get("costPrice") or raw_item.get("price") or 0.0)
+
         stock = int(raw_item.get("stock") or 0)
         
         pricing = cls.calculate_price(cost)
         avail_stock = max(0, stock - cls.SAFETY_BUFFER)
+        barcode = raw_item.get("barcode") or cls.generate_ean13_barcode(orig_sku)
 
         return {
             "sku": cls.format_sku(orig_sku),
@@ -242,6 +281,9 @@ ${bannedList}
             "vendor": cls.BRAND_NAME,
             "price": pricing["price"],
             "compare_at_price": pricing["compare_at_price"] if cls.ENABLE_COMPARE_AT else None,
+            "barcode": barcode,
+            "listPrice": list_price,
+            "esShippingFee": shipping_fee,
             "stock": avail_stock,
             "raw_stock": stock,
             "description_html": cls.clean_description(raw_item.get("description", "")),
@@ -311,7 +353,8 @@ class ShopifyClient:
                     {
                         "sku": sku,
                         "price": str(product_data["price"]),
-                        "compare_at_price": str(product_data["compare_at_price"]),
+                        "compare_at_price": str(product_data["compare_at_price"]) if product_data.get("compare_at_price") else None,
+                        "barcode": product_data.get("barcode", ""),
                         "inventory_management": "shopify",
                         "inventory_policy": "deny",
                     }

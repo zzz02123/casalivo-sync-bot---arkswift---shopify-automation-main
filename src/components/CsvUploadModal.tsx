@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UploadCloud, FileSpreadsheet, Check, AlertCircle, X, ArrowRight } from 'lucide-react';
 import Papa from 'papaparse';
 import { ArkSwiftRawItem } from '../types';
+import { generateEan13Barcode } from '../utils/whitewashEngine';
 
 interface CsvUploadModalProps {
   isOpen: boolean;
@@ -20,6 +21,8 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
   const [columnMapping, setColumnMapping] = useState<{
     sku: string;
     title: string;
+    listPrice: string;
+    esShippingFee: string;
     price: string;
     stock: string;
     vendor: string;
@@ -30,6 +33,8 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
   }>({
     sku: '',
     title: '',
+    listPrice: '',
+    esShippingFee: '',
     price: '',
     stock: '',
     vendor: '',
@@ -64,10 +69,22 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
         setHeaders(detectedHeaders);
 
         // Auto match columns based on typical Aosom / ArkSwift headers
+        const matchedListPrice =
+          detectedHeaders.find((h) => /^list\s*price/i.test(h)) ||
+          detectedHeaders.find((h) => /list\s*price|cost\s*price|供货价|单价|批发价|基础价/i.test(h)) ||
+          '';
+
+        const matchedShipping =
+          detectedHeaders.find((h) => /es\s*shipping\s*fee/i.test(h)) ||
+          detectedHeaders.find((h) => /shipping\s*fee|es\s*shipping|运费|flete/i.test(h)) ||
+          '';
+
         const mapping = {
           sku: detectedHeaders.find((h) => /^seller\s*sku$/i.test(h)) || detectedHeaders.find((h) => /sku|商品编码|条形码|code|item_no/i.test(h)) || detectedHeaders[0] || '',
           title: detectedHeaders.find((h) => /product\s*name.*spanish|spanish.*name/i.test(h)) || detectedHeaders.find((h) => /title|name|商品名称|标题|item_name/i.test(h)) || detectedHeaders[1] || '',
-          price: detectedHeaders.find((h) => /list\s*price|cost|price|成本|供货价|单价|批发价/i.test(h)) || '',
+          listPrice: matchedListPrice || detectedHeaders.find((h) => /cost|price|成本/i.test(h)) || '',
+          esShippingFee: matchedShipping || '',
+          price: matchedListPrice || detectedHeaders.find((h) => /cost|price|成本/i.test(h)) || '',
           stock: detectedHeaders.find((h) => /qty\s*avail|stock|quantity|qty|库存|数量|可用库存/i.test(h)) || '',
           vendor: detectedHeaders.find((h) => /vendor|supplier|品牌|供应商|原厂/i.test(h)) || '',
           images: detectedHeaders.find((h) => /image|img|图片|主图|pic/i.test(h)) || '',
@@ -89,7 +106,19 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
     const items: ArkSwiftRawItem[] = parsedRows.map((row, idx) => {
       const rawSku = String(row[columnMapping.sku] || `ITEM-${idx + 1}`).trim();
       const rawTitle = String(row[columnMapping.title] || `ArkSwift Item ${rawSku}`).trim();
-      const rawPrice = parseFloat(String(row[columnMapping.price] || '0').replace(/[^0-9.]/g, '')) || 25.0;
+      
+      // 提取 List Price 和 ES Shipping Fee 并相加作为基准成本
+      const listPriceVal = columnMapping.listPrice
+        ? parseFloat(String(row[columnMapping.listPrice] || '0').replace(/[^0-9.]/g, '')) || 0
+        : parseFloat(String(row[columnMapping.price] || '0').replace(/[^0-9.]/g, '')) || 0;
+
+      const shippingFeeVal = columnMapping.esShippingFee
+        ? parseFloat(String(row[columnMapping.esShippingFee] || '0').replace(/[^0-9.]/g, '')) || 0
+        : 0;
+
+      const combinedCost = listPriceVal + shippingFeeVal;
+      const finalCost = combinedCost > 0 ? combinedCost : (parseFloat(String(row[columnMapping.price] || '25.0').replace(/[^0-9.]/g, '')) || 25.0);
+
       const rawStock = parseInt(String(row[columnMapping.stock] || '0').replace(/[^0-9]/g, '')) || 10;
       const rawVendor = String(row[columnMapping.vendor] || 'SPANISH AOSOM SL').trim();
       // Requirement 1: Column X Category is Aosom's 3rd-level English category
@@ -107,12 +136,15 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
         originalSku: rawSku,
         originalTitle: rawTitle,
         originalVendor: rawVendor,
-        originalPrice: rawPrice,
+        originalPrice: finalCost,
+        listPrice: listPriceVal || finalCost,
+        esShippingFee: shippingFeeVal,
         stock: rawStock,
         category: rawCategory || 'Greenhouse',
         englishCategory: rawCategory,
         mainColor: rawColor,
         dimensions: rawDims,
+        barcode: generateEan13Barcode(rawSku),
         images,
         description: `Imported from Aosom/ArkSwift CSV export (${rawSku})`,
       };
@@ -239,13 +271,33 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">供货底价 / 成本 (€) *</label>
+                  <label className="block text-slate-400 mb-1">
+                    Aosom 底价列 (List Price Excl. Tax) *
+                  </label>
                   <select
-                    value={columnMapping.price}
-                    onChange={(e) => setColumnMapping({ ...columnMapping, price: e.target.value })}
+                    value={columnMapping.listPrice}
+                    onChange={(e) => setColumnMapping({ ...columnMapping, listPrice: e.target.value, price: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
                   >
                     <option value="">-- 未指定 (默认 €25.00) --</option>
+                    {headers.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1">
+                    西班牙运费列 (ES Shipping Fee)
+                  </label>
+                  <select
+                    value={columnMapping.esShippingFee}
+                    onChange={(e) => setColumnMapping({ ...columnMapping, esShippingFee: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-amber-300 font-medium"
+                  >
+                    <option value="">-- 无 / 表格未包含 (€0.00) --</option>
                     {headers.map((h) => (
                       <option key={h} value={h}>
                         {h}
@@ -268,6 +320,19 @@ export const CsvUploadModal: React.FC<CsvUploadModalProps> = ({
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Pricing Rule Note */}
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-200/90 flex items-start gap-2">
+                <span className="text-base shrink-0 leading-none">⚡</span>
+                <div>
+                  <strong>自动核算规则生效：</strong>系统将 <strong>List Price</strong> 与 <strong>ES Shipping Fee</strong> 相加计算基准成本：
+                  <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-amber-300/90 font-mono">
+                    <span className="bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40">相加 ≤ €100 ➔ 1.55 倍</span>
+                    <span className="bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40">相加 €100~€200 ➔ 1.50 倍</span>
+                    <span className="bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40">相加 &gt; €200 ➔ 1.45 倍</span>
+                  </div>
                 </div>
               </div>
             </div>

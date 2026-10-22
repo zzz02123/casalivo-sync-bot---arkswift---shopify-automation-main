@@ -17,11 +17,13 @@ export const WhitewashPricingPanel: React.FC<WhitewashPricingPanelProps> = ({
   onUpdatePricing,
 }) => {
   const [activeTab, setActiveTab] = useState<'whitewash' | 'pricing'>('pricing');
-  const [simCost, setSimCost] = useState<number>(38.5);
+  const [simListPrice, setSimListPrice] = useState<number>(35.0);
+  const [simShippingFee, setSimShippingFee] = useState<number>(7.5);
   const [newBannedWord, setNewBannedWord] = useState('');
 
-  // Simulator calculation
-  const simResult = calculatePricing(simCost, pricingConfig);
+  // Simulator calculation: List Price + ES Shipping Fee
+  const simTotalCost = (simListPrice || 0) + (simShippingFee || 0);
+  const simResult = calculatePricing(simTotalCost, pricingConfig);
 
   const handleAddTier = () => {
     const newTier: PricingTier = {
@@ -113,10 +115,10 @@ export const WhitewashPricingPanel: React.FC<WhitewashPricingPanelProps> = ({
                 <div>
                   <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                     <Sliders className="w-4 h-4 text-amber-400" />
-                    阶梯加价规则配置 (Tier Rules)
+                    阶梯定价引擎 (List Price + ES Shipping Fee)
                   </h3>
                   <p className="text-xs text-slate-400">
-                    根据进货供货价自动匹配倍率，确保高货值具备竞争力、低货值保证利润率
+                    Aosom 原始 List Price 与 ES Shipping Fee 相加后按阶梯核算售价：≤ €100 (1.55x)、€100~€200 (1.50x)、&gt; €200 (1.45x)
                   </p>
                 </div>
                 <button
@@ -331,26 +333,53 @@ export const WhitewashPricingPanel: React.FC<WhitewashPricingPanelProps> = ({
                   </span>
                 </div>
 
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">
-                    模拟输入 ArkSwift 供货底价 (Cost Price):
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-slate-400 font-bold text-sm">€</span>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={simCost}
-                      onChange={(e) => setSimCost(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-slate-900 border border-amber-500/50 rounded-xl pl-8 pr-3 py-2 text-white font-mono text-base font-bold focus:outline-none focus:ring-1 focus:ring-amber-400"
-                    />
+                {/* Dual Inputs: List Price & ES Shipping Fee */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">
+                      Aosom List Price:
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-slate-400 font-bold text-xs">€</span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={simListPrice}
+                        onChange={(e) => setSimListPrice(parseFloat(e.target.value) || 0)}
+                        className="w-full bg-slate-900 border border-amber-500/50 rounded-xl pl-6 pr-2 py-1.5 text-white font-mono text-sm font-bold focus:outline-none focus:ring-1 focus:ring-amber-400"
+                      />
+                    </div>
                   </div>
+
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">
+                      ES Shipping Fee:
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-slate-400 font-bold text-xs">€</span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={simShippingFee}
+                        onChange={(e) => setSimShippingFee(parseFloat(e.target.value) || 0)}
+                        className="w-full bg-slate-900 border border-amber-500/50 rounded-xl pl-6 pr-2 py-1.5 text-white font-mono text-sm font-bold focus:outline-none focus:ring-1 focus:ring-amber-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Base Cost Badge */}
+                <div className="p-2 bg-slate-900/90 border border-slate-800 rounded-lg flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-400">两者相加基准成本:</span>
+                  <span className="text-amber-300 font-bold">
+                    €{simListPrice.toFixed(2)} + €{simShippingFee.toFixed(2)} = €{simTotalCost.toFixed(2)}
+                  </span>
                 </div>
 
                 {/* Calculation Outputs */}
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800">
-                    <div className="text-[10px] text-slate-400 mb-0.5">Shopify 建议售价</div>
+                    <div className="text-[10px] text-slate-400 mb-0.5">Shopify 建议售价 (Price)</div>
                     <div className="text-xl font-extrabold text-amber-400 font-mono">
                       €{simResult.sellingPrice.toFixed(2)}
                     </div>
@@ -378,12 +407,14 @@ export const WhitewashPricingPanel: React.FC<WhitewashPricingPanelProps> = ({
 
                 <div className="text-[11px] text-slate-400 bg-slate-900/40 p-2.5 rounded-lg border border-slate-800/60 space-y-1">
                   <div className="flex justify-between">
-                    <span>供货成本:</span>
-                    <span className="font-mono text-white">€{simCost.toFixed(2)}</span>
+                    <span>相加总成本 (List + 运费):</span>
+                    <span className="font-mono text-white">€{simTotalCost.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>附加运杂费:</span>
-                    <span className="font-mono text-white">€{pricingConfig.shippingFee.toFixed(2)}</span>
+                    <span>核算匹配倍率:</span>
+                    <span className="font-mono text-amber-300 font-semibold">
+                      {simTotalCost <= 100 ? '1.55x (≤€100)' : simTotalCost <= 200 ? '1.50x (€100~€200)' : '1.45x (>€200)'}
+                    </span>
                   </div>
                   <div className="flex justify-between font-semibold text-amber-300 pt-1 border-t border-slate-800">
                     <span>纯利润 (每件):</span>

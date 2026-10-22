@@ -499,8 +499,9 @@ export const ProductCatalogTable: React.FC<ProductCatalogTableProps> = ({
                                 </th>
                                 <th className="py-1.5 px-3">Casalivo SKU</th>
                                 <th className="py-1.5 px-3">Aosom 原厂 SKU</th>
-                                <th className="py-1.5 px-3">成本供货价</th>
-                                <th className="py-1.5 px-3">核算零售售价</th>
+                                <th className="py-1.5 px-3">EAN 条形码 (Barcode)</th>
+                                <th className="py-1.5 px-3">成本 (List Price + 运费)</th>
+                                <th className="py-1.5 px-3">核算售价 (Price)</th>
                                 <th className="py-1.5 px-3">原仓 ➔ 可售库存</th>
                                 <th className="py-1.5 px-3">重量 / 规格</th>
                               </tr>
@@ -526,11 +527,22 @@ export const ProductCatalogTable: React.FC<ProductCatalogTableProps> = ({
                                   <td className="py-2 px-3 font-mono text-slate-400">
                                     {v.originalSku}
                                   </td>
-                                  <td className="py-2 px-3 font-mono text-slate-400">
-                                    €{v.costPrice.toFixed(2)}
+                                  <td className="py-2 px-3 font-mono text-[11px] text-sky-400 font-semibold whitespace-nowrap">
+                                    {v.barcode || '-'}
                                   </td>
-                                  <td className="py-2 px-3 font-mono font-bold text-emerald-400">
-                                    €{v.price.toFixed(2)}
+                                  <td className="py-2 px-3 font-mono text-slate-300">
+                                    <div>€{v.costPrice.toFixed(2)}</div>
+                                    {v.esShippingFee !== undefined && v.esShippingFee > 0 && (
+                                      <div className="text-[10px] text-slate-500 font-mono">
+                                        底€{v.listPrice?.toFixed(2)} + 运€{v.esShippingFee.toFixed(2)}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-3 font-mono">
+                                    <div className="font-bold text-emerald-400">€{v.price.toFixed(2)}</div>
+                                    <div className="text-[10px] text-amber-400/90 font-mono">
+                                      {v.costPrice <= 100 ? '1.55x' : v.costPrice <= 200 ? '1.50x' : '1.45x'}
+                                    </div>
                                   </td>
                                   <td className="py-2 px-3 font-mono">
                                     <span className="text-slate-400">{v.stock}件</span> ➔{' '}
